@@ -94,11 +94,29 @@ class NahaoDancer {
     } else if (judgment === 'good') {
       // 良好判定时播放略微迟缓的动作
       this.dance(commandType);
-    } else if (judgment === 'bad') {
-      // 勉强判定时播放轻微动作
-      this.dance('idle');
-    } else {
-      // miss不触发动作
+    } else if (judgment === 'bad' || judgment === 'miss') {
+      // 不良判定或miss时暂停动画
+      // 这里需要调用新的暂停方法
+      this.pauseAnimation();
+    }
+  }
+
+  /**
+   * 暂停当前动画
+   */
+  pauseAnimation() {
+    // 尝试暂停当前动画
+    if (this.model && this.model.mixer) {
+      // 暂停混合器更新，这会冻结所有正在播放的动画
+      this.model.mixer.timeScale = 0;
+
+      // 设置一个短暂的暂停后恢复idle动画
+      setTimeout(() => {
+        // 恢复混合器正常速度
+        this.model.mixer.timeScale = 1;
+        // 切换回idle动画
+        this.model.playAnimation('idle');
+      }, 500); // 暂停0.5秒
     }
   }
 

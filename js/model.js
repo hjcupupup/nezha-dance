@@ -124,7 +124,7 @@ class NahaoModel {
   }
 
   loadGLTFModel() {
-    console.log('开始加载GLTF模型');
+    console.log('开始加载GLTF模型 - 将使用Three.js直接创建动画');
 
     // 创建加载器
     const loader = new THREE.GLTFLoader();
@@ -140,71 +140,54 @@ class NahaoModel {
     loadingEl.textContent = '加载模型中...';
     this.container.appendChild(loadingEl);
 
-    // 加载模型 - 使用用户提供的路径
-    const modelPath = './assets/nezha-hunyuan.glb';
-    console.log(`尝试从路径加载模型: ${modelPath}`);
+    // 尝试加载所有可用的模型文件，以防一个不行
+    const fallbackModels = ['./assets/hunyuan-nezha-blender-modify.glb', './assets/nezha-hunyuan.glb', './assets/nezha.glb', './assets/nezha_updated.glb'];
 
-    // 添加模型路径调试信息
-    const absolutePath = new URL(modelPath, window.location.href).href;
-    console.log(`模型的绝对路径: ${absolutePath}`);
+    // 尝试加载第一个模型
+    this.tryLoadModelWithoutAnimation(loader, fallbackModels, 0, loadingEl);
+  }
+
+  // 新函数：加载模型但不使用其骨骼动画
+  tryLoadModelWithoutAnimation(loader, modelPaths, index, loadingEl) {
+    if (index >= modelPaths.length) {
+      console.error('所有模型都加载失败，使用备用模型');
+      this.createSimpleNahaoModel();
+      if (loadingEl && loadingEl.parentNode) {
+        this.container.removeChild(loadingEl);
+      }
+      return;
+    }
+
+    const currentPath = modelPaths[index];
+    console.log(`尝试加载模型文件 (${index + 1}/${modelPaths.length}): ${currentPath}`);
 
     loader.load(
       // 模型URL
-      modelPath,
+      currentPath,
 
       // 加载成功回调
       gltf => {
         console.log('GLTF模型加载成功', gltf);
 
         // 移除加载提示
-        if (loadingEl.parentNode) {
+        if (loadingEl && loadingEl.parentNode) {
           this.container.removeChild(loadingEl);
         }
 
         // 保存模型引用
         this.model = gltf.scene;
 
-        // 调整模型位置和比例 - 增大模型比例
+        // 调整模型位置和比例
         this.model.position.set(0, 0, 0);
-        this.model.scale.set(1.5, 1.5, 1.5); // 增大模型比例
+        this.model.scale.set(1.5, 1.5, 1.5);
 
         // 添加到场景
         this.scene.add(this.model);
         console.log('模型已添加到场景');
 
-        // 处理骨骼动画
-        if (gltf.animations && gltf.animations.length > 0) {
-          console.log(`模型包含 ${gltf.animations.length} 个动画`);
-
-          // 打印所有可用动画的名称，帮助调试
-          gltf.animations.forEach((anim, index) => {
-            console.log(`动画 ${index}: ${anim.name}, 持续时间: ${anim.duration}秒`);
-          });
-
-          // 创建动画混合器
-          this.mixer = new THREE.AnimationMixer(this.model);
-
-          // 使用增强的动画映射
-          this.mapAnimationsEnhanced(gltf.animations);
-        } else {
-          console.log('模型没有动画，尝试为骨骼创建基本动画');
-          // 检查模型是否有骨骼
-          let hasSkeleton = false;
-          this.model.traverse(object => {
-            if (object.isBone || object.isSkinnedMesh) {
-              hasSkeleton = true;
-              console.log('找到骨骼或蒙皮网格:', object.name);
-            }
-          });
-
-          if (hasSkeleton) {
-            console.log('模型有骨骼但没有动画，将创建基本骨骼动画');
-            this.createBasicSkeletonAnimations();
-          } else {
-            console.log('模型没有骨骼，创建模拟动画');
-            this.createSimulatedAnimations();
-          }
-        }
+        // 忽略GLB中的骨骼动画，直接创建基于Three.js的动画
+        console.log('跳过骨骼动画，创建基于Three.js的简单动画');
+        this.createThreeJsAnimations();
       },
 
       // 加载进度回调
@@ -220,585 +203,113 @@ class NahaoModel {
 
       // 加载错误回调
       error => {
-        console.error('加载GLTF模型时出错:', error);
-        loadingEl.textContent = '模型加载失败，使用备用模型';
+        console.error(`加载模型 ${currentPath} 失败:`, error);
 
-        // 添加详细错误信息
-        console.error('模型加载错误详情:', {
-          modelPath,
-          absolutePath,
-          errorMessage: error.message,
-          errorStack: error.stack
-        });
-
-        // 尝试列出当前网页可访问的资源
-        console.log('尝试检查资源是否可访问...');
-        fetch(modelPath)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`资源获取失败: ${response.status} ${response.statusText}`);
-            }
-            console.log('资源可以访问!', response);
-            return response.blob();
-          })
-          .then(blob => {
-            console.log('模型资源大小:', blob.size);
-          })
-          .catch(fetchError => {
-            console.error('资源检查失败:', fetchError);
-          });
-
-        // 加载失败时使用简单几何体创建备用模型
-        setTimeout(() => {
-          this.createSimpleNahaoModel();
-          if (loadingEl.parentNode) {
-            this.container.removeChild(loadingEl);
-          }
-        }, 1500);
+        // 尝试下一个模型
+        this.tryLoadModelWithoutAnimation(loader, modelPaths, index + 1, loadingEl);
       }
     );
   }
 
-  // 增强的动画映射函数，对中文名称也进行支持
-  mapAnimationsEnhanced(animations) {
-    console.log('使用增强的动画映射函数处理动画');
+  // 新函数：使用Three.js动画系统创建简单动画
+  createThreeJsAnimations() {
+    console.log('创建基于Three.js的简单动画');
 
-    // 默认将第一个动画设为idle
-    if (animations.length > 0 && !this.animations.idle) {
-      console.log(`将第一个动画 "${animations[0].name}" 临时设为idle备用`);
-      this.animations.idle = this.mixer.clipAction(animations[0]);
-    }
-
-    // 遍历所有动画尝试匹配
-    for (const anim of animations) {
-      console.log(`处理动画: ${anim.name}`);
-      const animName = anim.name.toLowerCase();
-
-      // 检查每种动画类型的匹配
-      for (const [gameAnim, possibleNames] of Object.entries(this.animationConfig)) {
-        if (possibleNames.some(name => animName.includes(name.toLowerCase()))) {
-          console.log(`✓ 将动画 "${anim.name}" 映射到游戏动画 "${gameAnim}"`);
-          this.animations[gameAnim] = this.mixer.clipAction(anim);
-          // 为动画设置适当的循环方式
-          if (gameAnim === 'idle') {
-            this.animations[gameAnim].setLoop(THREE.LoopRepeat);
-          } else {
-            // 非idle动画可以设置为只播放一次
-            this.animations[gameAnim].setLoop(THREE.LoopOnce);
-            this.animations[gameAnim].clampWhenFinished = true; // 播放结束时保持最后一帧
-          }
-        }
-      }
-    }
-
-    // 如果没有找到特定动画，创建替代
-    for (const animName in this.animations) {
-      if (!this.animations[animName] && this.animations.idle) {
-        console.log(`未找到${animName}动画，将尝试创建替代动画`);
-        if (animName === 'space' && animations.length > 1) {
-          // 对于特殊动画，如果有多个动画，可以使用第二个动画
-          console.log('使用另一个动画作为space的替代');
-          this.animations.space = this.mixer.clipAction(animations[1]);
-        } else {
-          // 使用idle的克隆，但调整时间缩放
-          this.animations[animName] = this.animations.idle.clone();
-          // 对不同动作设置不同的播放速度
-          switch (animName) {
-            case 'up':
-              this.animations[animName].timeScale = 1.5; // 上跳动作更快
-              break;
-            case 'down':
-              this.animations[animName].timeScale = 0.8; // 下蹲动作较慢
-              break;
-            case 'left':
-            case 'right':
-              this.animations[animName].timeScale = 1.2; // 转向稍快
-              break;
-            case 'space':
-              this.animations[animName].timeScale = 2.0; // 特殊动作最快
-              break;
-          }
-        }
-      }
-    }
-
-    // 初始播放idle动画
-    if (this.animations.idle) {
-      console.log('开始播放idle动画');
-      this.animations.idle.play();
-    }
-  }
-
-  // 为有骨骼但没有动画的模型创建基本骨骼动画
-  createBasicSkeletonAnimations() {
-    console.log('为骨骼创建基本动画');
-
-    // 首先找到模型中的所有骨骼
-    const bones = [];
-    this.model.traverse(object => {
-      if (object.isBone) {
-        bones.push(object);
-        console.log(`找到骨骼: ${object.name}`);
-      }
-    });
-
-    if (bones.length === 0) {
-      console.log('未找到骨骼，将创建模拟动画');
-      this.createSimulatedAnimations();
-      return;
-    }
-
-    // 创建一个骨骼动画剪辑
-    try {
-      // 创建idle动画 - 轻微上下移动和旋转
-      const idleTracks = [];
-
-      // 为主体骨骼添加轻微上下移动
-      const rootBone = bones[0]; // 通常第一个骨骼是根骨骼
-      idleTracks.push(new THREE.KeyframeTrack(`${rootBone.name}.position[y]`, [0, 1, 2], [0, 0.05, 0]));
-
-      // 为某些骨骼添加轻微旋转
-      for (let i = 0; i < Math.min(bones.length, 5); i++) {
-        const bone = bones[i];
-        // 为不同骨骼添加不同轴的轻微旋转
-        const rotAxis = i % 3; // 0=x, 1=y, 2=z
-        const rotTrack = new THREE.KeyframeTrack(`${bone.name}.rotation[${rotAxis === 0 ? 'x' : rotAxis === 1 ? 'y' : 'z'}]`, [0, 1, 2], [bone.rotation[rotAxis], bone.rotation[rotAxis] + 0.05, bone.rotation[rotAxis]]);
-        idleTracks.push(rotTrack);
-      }
-
-      // 创建动画剪辑
-      const idleClip = new THREE.AnimationClip('idle', 2, idleTracks);
-      this.animations.idle = this.mixer.clipAction(idleClip);
-      this.animations.idle.play();
-
-      // 创建其他基本动画（简化版）
-      this.createSimpleSkeletonAnimation('up', bones, 'jump');
-      this.createSimpleSkeletonAnimation('down', bones, 'crouch');
-      this.createSimpleSkeletonAnimation('left', bones, 'left');
-      this.createSimpleSkeletonAnimation('right', bones, 'right');
-      this.createSimpleSkeletonAnimation('space', bones, 'dance');
-    } catch (error) {
-      console.error('创建基本骨骼动画失败:', error);
-      this.createSimulatedAnimations();
-    }
-  }
-
-  // 创建简单的骨骼动画
-  createSimpleSkeletonAnimation(name, bones, type) {
-    try {
-      const tracks = [];
-      const rootBone = bones[0];
-
-      // 根据类型创建不同的动画
-      switch (type) {
-        case 'jump':
-          // 跳跃动画
-          tracks.push(new THREE.KeyframeTrack(`${rootBone.name}.position[y]`, [0, 0.5, 1], [0, 0.5, 0]));
-          break;
-
-        case 'crouch':
-          // 下蹲动画
-          tracks.push(new THREE.KeyframeTrack(`${rootBone.name}.position[y]`, [0, 0.5, 1], [0, -0.2, 0]));
-          break;
-
-        case 'left':
-          // 向左转
-          tracks.push(new THREE.KeyframeTrack(`${rootBone.name}.rotation[y]`, [0, 0.5, 1], [0, -Math.PI / 4, 0]));
-          break;
-
-        case 'right':
-          // 向右转
-          tracks.push(new THREE.KeyframeTrack(`${rootBone.name}.rotation[y]`, [0, 0.5, 1], [0, Math.PI / 4, 0]));
-          break;
-
-        case 'dance':
-          // 舞蹈/特殊动作 - 旋转并跳跃
-          tracks.push(new THREE.KeyframeTrack(`${rootBone.name}.position[y]`, [0, 0.25, 0.5, 0.75, 1], [0, 0.3, 0, 0.3, 0]));
-          tracks.push(new THREE.KeyframeTrack(`${rootBone.name}.rotation[y]`, [0, 1], [0, Math.PI * 2]));
-          break;
-      }
-
-      // 如果有足够的骨骼，为其他骨骼添加动作
-      if (bones.length > 2) {
-        // 为手臂/腿部骨骼添加动作
-        for (let i = 1; i < Math.min(bones.length, 5); i++) {
-          const bone = bones[i];
-          let rotTrack;
-
-          switch (type) {
-            case 'jump':
-              // 跳跃时手臂上举
-              rotTrack = new THREE.KeyframeTrack(`${bone.name}.rotation[x]`, [0, 0.5, 1], [0, -Math.PI / 4, 0]);
-              break;
-
-            case 'crouch':
-              // 下蹲时手臂前伸
-              rotTrack = new THREE.KeyframeTrack(`${bone.name}.rotation[x]`, [0, 0.5, 1], [0, Math.PI / 6, 0]);
-              break;
-
-            case 'dance':
-              // 舞蹈时手臂摆动
-              rotTrack = new THREE.KeyframeTrack(`${bone.name}.rotation[z]`, [0, 0.25, 0.5, 0.75, 1], [0, Math.PI / 4, 0, -Math.PI / 4, 0]);
-              break;
-
-            default:
-              continue;
-          }
-
-          tracks.push(rotTrack);
-        }
-      }
-
-      // 创建动画剪辑
-      const clip = new THREE.AnimationClip(name, 1, tracks);
-      this.animations[name] = this.mixer.clipAction(clip);
-      this.animations[name].setLoop(THREE.LoopOnce);
-      this.animations[name].clampWhenFinished = true;
-    } catch (error) {
-      console.error(`创建${name}骨骼动画失败:`, error);
-    }
-  }
-
-  createSimpleNahaoModel() {
-    // 创建一个组作为模型容器
-    this.model = new THREE.Group();
-
-    // 材质
-    const skinMaterial = new THREE.MeshStandardMaterial({ color: 0xf5c0a5 });
-    const clothesMaterial = new THREE.MeshStandardMaterial({ color: 0xf72585 });
-    const blackMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 });
-    const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff6b6b });
-
-    // 头部
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), skinMaterial);
-    head.position.y = 1.6;
-
-    // 身体
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.2, 1.2, 32), clothesMaterial);
-    body.position.y = 0.7;
-
-    // 左眼
-    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), blackMaterial);
-    leftEye.position.set(0.15, 1.7, 0.35);
-
-    // 右眼
-    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), blackMaterial);
-    rightEye.position.set(-0.15, 1.7, 0.35);
-
-    // 第三只眼（哪吒额头的印记）
-    const thirdEye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 16), redMaterial);
-    thirdEye.position.set(0, 1.9, 0.35);
-
-    // 头发左侧髻
-    const leftHair = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 16), blackMaterial);
-    leftHair.position.set(0.35, 1.8, 0);
-
-    // 头发右侧髻
-    const rightHair = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 16), blackMaterial);
-    rightHair.position.set(-0.35, 1.8, 0);
-
-    // 左侧发带
-    const leftHairBand = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.02, 16, 32), redMaterial);
-    leftHairBand.position.set(0.35, 1.65, 0);
-    leftHairBand.rotation.x = Math.PI / 2;
-
-    // 右侧发带
-    const rightHairBand = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.02, 16, 32), redMaterial);
-    rightHairBand.position.set(-0.35, 1.65, 0);
-    rightHairBand.rotation.x = Math.PI / 2;
-
-    // 添加所有部件到模型组
-    this.model.add(head);
-    this.model.add(body);
-    this.model.add(leftEye);
-    this.model.add(rightEye);
-    this.model.add(thirdEye);
-    this.model.add(leftHair);
-    this.model.add(rightHair);
-    this.model.add(leftHairBand);
-    this.model.add(rightHairBand);
-
-    // 添加手臂和腿
-    this.addLimbs();
-
-    console.log('简化模型部件创建完成');
-
-    // 添加模型到场景
-    this.scene.add(this.model);
-    console.log('简化模型添加到场景');
-
-    // 创建动画混合器
+    // 创建动画混合器 - 使用场景中的模型
     this.mixer = new THREE.AnimationMixer(this.model);
 
-    // 创建模拟动画
-    this.createSimulatedAnimations();
-  }
+    // 定义可以用于动画的目标属性和关键帧
+    const modelPosition = this.model.position.clone();
+    const modelRotation = this.model.rotation.clone();
+    const modelScale = this.model.scale.clone();
 
-  addLimbs() {
-    const skinMaterial = new THREE.MeshStandardMaterial({ color: 0xf5c0a5 });
-    const pantsMaterial = new THREE.MeshStandardMaterial({ color: 0xb5179e });
+    // 创建KV对象存储所有动画，键为动画名称，值为AnimationClip
+    const animClips = {};
 
-    // 左手臂
-    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 16), skinMaterial);
-    leftArm.position.set(0.5, 0.9, 0);
-    leftArm.rotation.z = -Math.PI / 6;
+    // 1. 创建待机动画（轻微上下移动）
+    const idleTracks = [];
+    // 位置轨道 - 上下浮动
+    idleTracks.push(
+      new THREE.KeyframeTrack(
+        '.position[y]',
+        [0, 1, 2], // 时间点
+        [modelPosition.y, modelPosition.y + 0.1, modelPosition.y] // 对应值
+      )
+    );
+    // 旋转轨道 - 轻微摇摆
+    idleTracks.push(new THREE.KeyframeTrack('.rotation[y]', [0, 1, 2], [modelRotation.y, modelRotation.y + 0.05, modelRotation.y]));
 
-    // 右手臂
-    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 16), skinMaterial);
-    rightArm.position.set(-0.5, 0.9, 0);
-    rightArm.rotation.z = Math.PI / 6;
+    // 创建动画剪辑
+    animClips.idle = new THREE.AnimationClip('idle', 2, idleTracks);
 
-    // 左腿
-    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 16), pantsMaterial);
-    leftLeg.position.set(0.15, 0, 0);
+    // 2. 创建向上跳跃动画
+    const upTracks = [];
+    // 位置轨道 - 向上跳
+    upTracks.push(new THREE.KeyframeTrack('.position[y]', [0, 0.3, 0.6, 1], [modelPosition.y, modelPosition.y + 0.5, modelPosition.y + 0.3, modelPosition.y]));
+    // 缩放轨道 - 跳跃时稍微拉伸
+    upTracks.push(new THREE.KeyframeTrack('.scale[y]', [0, 0.3, 0.6, 1], [modelScale.y, modelScale.y * 1.1, modelScale.y * 1.05, modelScale.y]));
 
-    // 右腿
-    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.8, 16), pantsMaterial);
-    rightLeg.position.set(-0.15, 0, 0);
+    animClips.up = new THREE.AnimationClip('up', 1, upTracks);
 
-    // 添加到模型
-    this.model.add(leftArm);
-    this.model.add(rightArm);
-    this.model.add(leftLeg);
-    this.model.add(rightLeg);
+    // 3. 创建向下蹲动画
+    const downTracks = [];
+    // 位置轨道 - 下蹲
+    downTracks.push(new THREE.KeyframeTrack('.position[y]', [0, 0.3, 0.6, 1], [modelPosition.y, modelPosition.y - 0.3, modelPosition.y - 0.2, modelPosition.y]));
+    // 缩放轨道 - 下蹲时压缩
+    downTracks.push(new THREE.KeyframeTrack('.scale[y]', [0, 0.3, 0.6, 1], [modelScale.y, modelScale.y * 0.8, modelScale.y * 0.9, modelScale.y]));
 
-    // 为动画保存引用
-    this.leftArm = leftArm;
-    this.rightArm = rightArm;
-    this.leftLeg = leftLeg;
-    this.rightLeg = rightLeg;
-  }
+    animClips.down = new THREE.AnimationClip('down', 1, downTracks);
 
-  createSimulatedAnimations() {
-    console.log('创建模拟动画');
-    try {
-      // 检查模型和混合器是否存在
-      if (!this.model) {
-        console.error('无法创建动画：模型不存在');
-        return;
+    // 4. 创建向左转动画
+    const leftTracks = [];
+    // 旋转轨道 - 向左转
+    leftTracks.push(new THREE.KeyframeTrack('.rotation[y]', [0, 0.4, 0.8, 1], [modelRotation.y, modelRotation.y + Math.PI / 4, modelRotation.y + Math.PI / 8, modelRotation.y]));
+    // 位置轨道 - 向左微移
+    leftTracks.push(new THREE.KeyframeTrack('.position[x]', [0, 0.3, 0.7, 1], [modelPosition.x, modelPosition.x - 0.2, modelPosition.x - 0.1, modelPosition.x]));
+
+    animClips.left = new THREE.AnimationClip('left', 1, leftTracks);
+
+    // 5. 创建向右转动画
+    const rightTracks = [];
+    // 旋转轨道 - 向右转
+    rightTracks.push(new THREE.KeyframeTrack('.rotation[y]', [0, 0.4, 0.8, 1], [modelRotation.y, modelRotation.y - Math.PI / 4, modelRotation.y - Math.PI / 8, modelRotation.y]));
+    // 位置轨道 - 向右微移
+    rightTracks.push(new THREE.KeyframeTrack('.position[x]', [0, 0.3, 0.7, 1], [modelPosition.x, modelPosition.x + 0.2, modelPosition.x + 0.1, modelPosition.x]));
+
+    animClips.right = new THREE.AnimationClip('right', 1, rightTracks);
+
+    // 6. 创建特殊动画（空格键）- 旋转一周
+    const spaceTracks = [];
+    // 旋转轨道 - 旋转一圈
+    spaceTracks.push(new THREE.KeyframeTrack('.rotation[y]', [0, 0.5, 1], [modelRotation.y, modelRotation.y + Math.PI, modelRotation.y + Math.PI * 2]));
+    // 位置轨道 - 上下跳跃
+    spaceTracks.push(new THREE.KeyframeTrack('.position[y]', [0, 0.25, 0.5, 0.75, 1], [modelPosition.y, modelPosition.y + 0.3, modelPosition.y + 0.1, modelPosition.y + 0.3, modelPosition.y]));
+    // 缩放轨道 - 忽大忽小
+    spaceTracks.push(new THREE.KeyframeTrack('.scale', [0, 0.25, 0.5, 0.75, 1], [modelScale.x, modelScale.y, modelScale.z, modelScale.x * 1.2, modelScale.y * 1.2, modelScale.z * 1.2, modelScale.x * 0.9, modelScale.y * 0.9, modelScale.z * 0.9, modelScale.x * 1.1, modelScale.y * 1.1, modelScale.z * 1.1, modelScale.x, modelScale.y, modelScale.z]));
+
+    animClips.space = new THREE.AnimationClip('space', 1, spaceTracks);
+
+    // 为每个动画创建AnimationAction对象
+    this.animations = {};
+
+    for (const [name, clip] of Object.entries(animClips)) {
+      this.animations[name] = this.mixer.clipAction(clip);
+
+      // 设置动画属性
+      if (name === 'idle') {
+        this.animations[name].setLoop(THREE.LoopRepeat);
+      } else {
+        this.animations[name].setLoop(THREE.LoopOnce);
+        this.animations[name].clampWhenFinished = true;
       }
 
-      // 如果mixer不存在，需要先创建
-      if (!this.mixer) {
-        console.log('混合器不存在，正在创建新的混合器');
-        this.mixer = new THREE.AnimationMixer(this.model);
-      }
-
-      if (!this.mixer) {
-        console.error('无法创建动画混合器，可能THREE.AnimationMixer不可用');
-        return;
-      }
-
-      console.log('使用混合器创建动画:', this.mixer);
-
-      // 由于没有真实的动画文件，我们模拟一些简单的动画
-
-      // 空闲动画 - 轻微上下移动
-      const idleTrack = this.createIdleAnimation();
-      if (idleTrack) {
-        this.animations.idle = this.mixer.clipAction(idleTrack);
-        this.animations.idle.play();
-      }
-
-      // 方向键动画
-      const upAnim = this.createUpAnimation();
-      if (upAnim) this.animations.up = this.mixer.clipAction(upAnim);
-
-      const downAnim = this.createDownAnimation();
-      if (downAnim) this.animations.down = this.mixer.clipAction(downAnim);
-
-      const leftAnim = this.createLeftAnimation();
-      if (leftAnim) this.animations.left = this.mixer.clipAction(leftAnim);
-
-      const rightAnim = this.createRightAnimation();
-      if (rightAnim) this.animations.right = this.mixer.clipAction(rightAnim);
-
-      const spaceAnim = this.createSpaceAnimation();
-      if (spaceAnim) this.animations.space = this.mixer.clipAction(spaceAnim);
-
-      console.log('所有模拟动画创建完成');
-    } catch (error) {
-      console.error('创建模拟动画失败:', error);
-      // 记录更多调试信息
-      console.error('调试信息:', {
-        hasModel: !!this.model,
-        hasMixer: !!this.mixer,
-        hasThree: typeof THREE !== 'undefined',
-        hasAnimationMixer: typeof THREE !== 'undefined' && typeof THREE.AnimationMixer !== 'undefined'
-      });
+      console.log(`创建了 ${name} 动画`);
     }
-  }
 
-  // 创建简单的姿势动画
-  createIdleAnimation() {
-    try {
-      const times = [0, 0.5, 1];
-      const values = [
-        0,
-        0,
-        0, // 起始位置
-        0,
-        0.05,
-        0, // 中间位置（轻微上升）
-        0,
-        0,
-        0 // 结束位置（回到起始）
-      ];
-
-      const posTrack = new THREE.KeyframeTrack('.position[y]', times, values);
-      return new THREE.AnimationClip('idle', 1, [posTrack]);
-    } catch (error) {
-      console.error('创建空闲动画失败:', error);
-      return null;
-    }
-  }
-
-  createUpAnimation() {
-    try {
-      const times = [0, 0.2, 0.4, 0.6, 0.8, 1];
-
-      // 检查是否有部件引用存在
-      if (!this.leftArm || !this.rightArm) {
-        console.warn('缺少部件引用，创建简化动画');
-        // 创建一个简单的位置动画作为替代
-        const posTrack = new THREE.KeyframeTrack('.position[y]', [0, 0.5, 1], [0, 0.2, 0]);
-        return new THREE.AnimationClip('up', 1, [posTrack]);
-      }
-
-      // 手臂向上举
-      const leftArmRotation = [-Math.PI / 6, -Math.PI / 3, -Math.PI / 2, -Math.PI / 3, -Math.PI / 6, -Math.PI / 6];
-      const rightArmRotation = [Math.PI / 6, Math.PI / 3, Math.PI / 2, Math.PI / 3, Math.PI / 6, Math.PI / 6];
-
-      // 使用部件uuid作为轨道名
-      const leftArmTrack = new THREE.KeyframeTrack(`${this.leftArm.uuid}.rotation[z]`, times, leftArmRotation);
-      const rightArmTrack = new THREE.KeyframeTrack(`${this.rightArm.uuid}.rotation[z]`, times, rightArmRotation);
-
-      // 身体上升
-      const bodyPosTrack = new THREE.KeyframeTrack('.position[y]', [0, 0.3, 0.5, 0.8, 1], [0, 0.2, 0.3, 0.1, 0]);
-
-      return new THREE.AnimationClip('up', 1, [leftArmTrack, rightArmTrack, bodyPosTrack]);
-    } catch (error) {
-      console.error('创建上升动画失败:', error);
-      return null;
-    }
-  }
-
-  createDownAnimation() {
-    try {
-      const times = [0, 0.3, 0.6, 1];
-
-      // 检查是否有部件引用存在
-      if (!this.leftArm || !this.rightArm) {
-        console.warn('缺少部件引用，创建简化动画');
-        // 创建一个简单的位置动画作为替代
-        const posTrack = new THREE.KeyframeTrack('.position[y]', [0, 0.5, 1], [0, -0.2, 0]);
-        return new THREE.AnimationClip('down', 1, [posTrack]);
-      }
-
-      // 手臂向下放
-      const leftArmRotation = [-Math.PI / 6, 0, 0, -Math.PI / 6];
-      const rightArmRotation = [Math.PI / 6, 0, 0, Math.PI / 6];
-
-      // 使用部件uuid作为轨道名
-      const leftArmTrack = new THREE.KeyframeTrack(`${this.leftArm.uuid}.rotation[z]`, times, leftArmRotation);
-      const rightArmTrack = new THREE.KeyframeTrack(`${this.rightArm.uuid}.rotation[z]`, times, rightArmRotation);
-
-      // 身体下蹲
-      const bodyPosTrack = new THREE.KeyframeTrack('.position[y]', [0, 0.3, 0.7, 1], [0, -0.2, -0.2, 0]);
-
-      return new THREE.AnimationClip('down', 1, [leftArmTrack, rightArmTrack, bodyPosTrack]);
-    } catch (error) {
-      console.error('创建下蹲动画失败:', error);
-      return null;
-    }
-  }
-
-  createLeftAnimation() {
-    try {
-      const times = [0, 0.3, 0.6, 1];
-
-      // 检查是否有部件引用存在
-      if (!this.leftArm) {
-        console.warn('缺少左臂引用，创建简化动画');
-        // 创建一个简单的旋转动画作为替代
-        const rotTrack = new THREE.KeyframeTrack('.rotation[y]', [0, 0.5, 1], [0, -Math.PI / 4, 0]);
-        return new THREE.AnimationClip('left', 1, [rotTrack]);
-      }
-
-      // 向左转身
-      const bodyRotation = [0, -Math.PI / 4, -Math.PI / 4, 0];
-      const bodyRotTrack = new THREE.KeyframeTrack('.rotation[y]', times, bodyRotation);
-
-      // 左手臂伸出
-      const leftArmRotation = [-Math.PI / 6, -Math.PI / 2, -Math.PI / 2, -Math.PI / 6];
-      const leftArmTrack = new THREE.KeyframeTrack(`${this.leftArm.uuid}.rotation[z]`, times, leftArmRotation);
-
-      return new THREE.AnimationClip('left', 1, [bodyRotTrack, leftArmTrack]);
-    } catch (error) {
-      console.error('创建左转动画失败:', error);
-      return null;
-    }
-  }
-
-  createRightAnimation() {
-    try {
-      const times = [0, 0.3, 0.6, 1];
-
-      // 检查是否有部件引用存在
-      if (!this.rightArm) {
-        console.warn('缺少右臂引用，创建简化动画');
-        // 创建一个简单的旋转动画作为替代
-        const rotTrack = new THREE.KeyframeTrack('.rotation[y]', [0, 0.5, 1], [0, Math.PI / 4, 0]);
-        return new THREE.AnimationClip('right', 1, [rotTrack]);
-      }
-
-      // 向右转身
-      const bodyRotation = [0, Math.PI / 4, Math.PI / 4, 0];
-      const bodyRotTrack = new THREE.KeyframeTrack('.rotation[y]', times, bodyRotation);
-
-      // 右手臂伸出
-      const rightArmRotation = [Math.PI / 6, Math.PI / 2, Math.PI / 2, Math.PI / 6];
-      const rightArmTrack = new THREE.KeyframeTrack(`${this.rightArm.uuid}.rotation[z]`, times, rightArmRotation);
-
-      return new THREE.AnimationClip('right', 1, [bodyRotTrack, rightArmTrack]);
-    } catch (error) {
-      console.error('创建右转动画失败:', error);
-      return null;
-    }
-  }
-
-  createSpaceAnimation() {
-    try {
-      const times = [0, 0.2, 0.4, 0.6, 0.8, 1];
-
-      // 检查是否有部件引用存在
-      if (!this.leftArm || !this.rightArm) {
-        console.warn('缺少部件引用，创建简化动画');
-        // 创建一个简单的跳跃动画
-        const posTrack = new THREE.KeyframeTrack('.position[y]', [0, 0.3, 0.6, 1], [0, 0.5, 0.2, 0]);
-        const rotTrack = new THREE.KeyframeTrack('.rotation[y]', [0, 0.5, 1], [0, Math.PI, Math.PI * 2]);
-        return new THREE.AnimationClip('space', 1, [posTrack, rotTrack]);
-      }
-
-      // 跳跃动作
-      const posY = [0, 0.3, 0.5, 0.5, 0.2, 0];
-      const bodyPosTrack = new THREE.KeyframeTrack('.position[y]', times, posY);
-
-      // 同时挥动双臂
-      const leftArmRotZ = [-Math.PI / 6, -Math.PI / 3, -Math.PI / 2, -Math.PI / 3, -Math.PI / 4, -Math.PI / 6];
-      const rightArmRotZ = [Math.PI / 6, Math.PI / 3, Math.PI / 2, Math.PI / 3, Math.PI / 4, Math.PI / 6];
-
-      const leftArmTrack = new THREE.KeyframeTrack(`${this.leftArm.uuid}.rotation[z]`, times, leftArmRotZ);
-      const rightArmTrack = new THREE.KeyframeTrack(`${this.rightArm.uuid}.rotation[z]`, times, rightArmRotZ);
-
-      // 旋转
-      const rotY = [0, Math.PI, Math.PI * 2, Math.PI * 2, Math.PI * 2, Math.PI * 2];
-      const bodyRotTrack = new THREE.KeyframeTrack('.rotation[y]', times, rotY);
-
-      return new THREE.AnimationClip('space', 1, [bodyPosTrack, leftArmTrack, rightArmTrack, bodyRotTrack]);
-    } catch (error) {
-      console.error('创建空格动画失败:', error);
-      return null;
+    // 启动idle动画
+    if (this.animations.idle) {
+      this.animations.idle.play();
+      console.log('开始播放idle动画');
     }
   }
 
@@ -811,6 +322,11 @@ class NahaoModel {
         if (anim !== name && this.animations[anim] && this.animations[anim].isRunning()) {
           this.animations[anim].fadeOut(0.2);
         }
+      }
+
+      // 确保混合器速度正常
+      if (this.mixer) {
+        this.mixer.timeScale = 1;
       }
 
       this.animations[name].reset();

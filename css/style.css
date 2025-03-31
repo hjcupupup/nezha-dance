@@ -29,7 +29,7 @@ body {
   width: 100%;
   height: 100%;
   position: absolute;
-  display: none !important;
+  display: none;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -239,8 +239,17 @@ button:hover {
 
 #final-score,
 #max-combo {
-  font-size: 24px;
-  margin: 10px 0;
+  font-size: 28px;
+  margin: 15px 0;
+  color: #4cc9f0;
+  text-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
+}
+
+#final-score span,
+#max-combo span {
+  color: #f72585;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(247, 37, 133, 0.7);
 }
 
 /* 动画效果 */
@@ -343,4 +352,13 @@ button:hover {
 
 .track.space {
   left: 80%;
+}
+
+/* 专门为结算页面添加样式 */
+#game-over {
+  background-color: rgba(22, 33, 62, 0.95);
+}
+
+#game-over h1 {
+  animation: pulse 1.5s infinite alternate;
 }

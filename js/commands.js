@@ -66,6 +66,11 @@ class CommandManager {
     const commandsOfType = this.commands.filter(cmd => cmd.type === commandType);
     if (commandsOfType.length === 0) {
       console.log(`没有类型为 ${commandType} 的命令`);
+      // 没有可用命令时也计为miss
+      this.showJudgment('miss');
+      if (this.onCommandMiss) {
+        this.onCommandMiss(commandType);
+      }
       return;
     }
 
@@ -104,9 +109,15 @@ class CommandManager {
       // 显示判定结果
       this.showJudgment(judgment);
 
-      // 触发命中回调
-      if (this.onCommandHit && judgment !== 'miss') {
-        this.onCommandHit(commandType, judgment);
+      // 触发相应的回调
+      if (judgment === 'miss') {
+        if (this.onCommandMiss) {
+          this.onCommandMiss(commandType);
+        }
+      } else {
+        if (this.onCommandHit) {
+          this.onCommandHit(commandType, judgment);
+        }
       }
     }
   }
