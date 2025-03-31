@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>哪吒炫舞 - 音乐舞蹈游戏</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="game-container">
+      <div id="game-start" class="game-state active">
+        <h1>哪吒炫舞</h1>
+        <button id="start-button">开始游戏</button>
+        <div class="instructions">
+          <h2>游戏说明</h2>
+          <p>使用键盘方向键（↑↓←→）和空格键跟随节奏跳舞！</p>
+          <p>根据屏幕底部向上移动的指令，及时按下对应按键获得分数。</p>
+          <p>完美匹配：Perfect | 良好匹配：Good | 勉强匹配：Bad | 未匹配：Miss</p>
+          <p><small>※ 注: 游戏加载Blender导出的哪吒3D模型，如果加载失败会使用备用模型。</small></p>
+
+          <!-- 增加键盘提示 -->
+          <div class="keyboard-hints">
+            <div class="key-hint">↑</div>
+            <div class="key-hint">↓</div>
+            <div class="key-hint">←</div>
+            <div class="key-hint">→</div>
+            <div class="key-hint space">空格</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="game-play" class="game-state">
+        <div id="score-container">分数: <span id="score">0</span></div>
+        <div id="combo-container">连击: <span id="combo">0</span></div>
+        <div id="dancer-container">
+          <!-- 3D角色将在此渲染 -->
+        </div>
+        <div id="command-container">
+          <!-- 轨道线 -->
+          <div class="command-tracks">
+            <div class="track up"></div>
+            <div class="track down"></div>
+            <div class="track left"></div>
+            <div class="track right"></div>
+            <div class="track space"></div>
+          </div>
+
+          <!-- 指令将在此生成 -->
+          <div id="judgment-line"></div>
+
+          <!-- 游戏中的键盘提示 -->
+          <div class="keyboard-hints">
+            <div class="key-hint">↑</div>
+            <div class="key-hint">↓</div>
+            <div class="key-hint">←</div>
+            <div class="key-hint">→</div>
+            <div class="key-hint space">空格</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="game-over" class="game-state">
+        <h1>游戏结束</h1>
+        <div id="final-score">总分: <span>0</span></div>
+        <div id="max-combo">最大连击: <span>0</span></div>
+        <button id="restart-button">再来一次</button>
+      </div>
+    </div>
+
+    <!-- 引入Three.js库 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <!-- 直接加载GLTFLoader，确保在模型脚本之前加载 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <script>
+      // 确保THREE库加载成功
+      window.addEventListener('DOMContentLoaded', function () {
+        if (typeof THREE === 'undefined') {
+          console.error('THREE.js库加载失败，游戏可能无法正常运行');
+          return;
+        }
+
+        // 检查GLTFLoader是否可用
+        if (typeof THREE.GLTFLoader === 'undefined') {
+          console.error('GLTFLoader加载失败，将使用备用模型');
+          // 尝试重新加载GLTFLoader
+          const gltfLoaderScript = document.createElement('script');
+          gltfLoaderScript.src = 'https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js';
+          gltfLoaderScript.onload = function () {
+            console.log('GLTFLoader重新加载成功');
+          };
+          document.head.appendChild(gltfLoaderScript);
+        } else {
+          console.log('GLTFLoader已成功加载');
+        }
+      });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- 游戏脚本 -->
+    <script src="js/model.js"></script>
+    <script src="js/commands.js"></script>
+    <script src="js/dancer.js"></script>
+    <script src="js/game.js"></script>
+
+    <!-- 显示操作提示 -->
+    <script>
+      // 检查Three.js是否加载成功
+      window.addEventListener('DOMContentLoaded', function () {
+        if (typeof THREE === 'undefined') {
+          console.error('THREE.js库加载失败，请检查网络连接或使用本地服务器运行游戏');
+          alert('THREE.js库加载失败，请检查网络连接或使用本地服务器运行游戏');
+        } else {
+          console.log('THREE.js库加载成功');
+        }
+
+        // 添加一个故障恢复方案，如果容器为空，手动创建必要元素
+        setTimeout(function () {
+          const dancerContainer = document.getElementById('dancer-container');
+          const commandContainer = document.getElementById('command-container');
+
+          if (dancerContainer && !dancerContainer.firstChild) {
+            console.log('检测到舞者容器为空，尝试手动初始化');
+            new NahaoModel('dancer-container');
+          }
+
+          if (commandContainer) {
+            const judgmentLine = document.getElementById('judgment-line');
+            if (!judgmentLine) {
+              console.log('未找到判定线，创建一个');
+              const line = document.createElement('div');
+              line.id = 'judgment-line';
+              line.style.bottom = '100px';
+              commandContainer.appendChild(line);
+            }
+          }
+        }, 1500);
+      });
+    </script>
+  </body>
+</html>

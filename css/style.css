@@ -1,0 +1,346 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+  background-color: #1a1a2e;
+  color: #ffffff;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+#game-container {
+  width: 800px;
+  height: 600px;
+  position: relative;
+  background-color: #16213e;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.game-state {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  display: none !important;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.game-state.active {
+  display: flex !important;
+  z-index: 100;
+  opacity: 1;
+}
+
+h1 {
+  font-size: 48px;
+  color: #ff6b6b;
+  margin-bottom: 30px;
+  text-shadow: 0 0 10px rgba(255, 107, 107, 0.7);
+}
+
+h2 {
+  font-size: 24px;
+  color: #4cc9f0;
+  margin-bottom: 15px;
+}
+
+button {
+  padding: 12px 30px;
+  font-size: 20px;
+  background-color: #f72585;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 20px 0;
+  transition: all 0.3s;
+}
+
+button:hover {
+  background-color: #b5179e;
+  transform: scale(1.05);
+}
+
+.instructions {
+  margin-top: 30px;
+  text-align: center;
+}
+
+.instructions p {
+  margin: 10px 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+#game-play {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  padding: 0;
+}
+
+#game-play.active {
+  display: flex !important;
+}
+
+#score-container,
+#combo-container {
+  position: absolute;
+  z-index: 10;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 5px;
+}
+
+#score-container {
+  top: 10px;
+  left: 10px;
+  font-size: 20px;
+}
+
+#combo-container {
+  top: 10px;
+  right: 10px;
+  font-size: 20px;
+}
+
+#dancer-container {
+  width: 100%;
+  height: 60%;
+  position: relative;
+  display: block;
+  min-height: 360px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+#command-container {
+  width: 100%;
+  height: 40%;
+  position: relative;
+  display: block;
+  min-height: 240px;
+  background-color: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+#judgment-line {
+  position: absolute;
+  width: 100%;
+  height: 5px;
+  background-color: #4cc9f0;
+  bottom: 100px;
+  z-index: 5;
+  box-shadow: 0 0 15px rgba(76, 201, 240, 0.8);
+  animation: glow 1.5s infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 10px rgba(76, 201, 240, 0.8);
+    height: 5px;
+  }
+  to {
+    box-shadow: 0 0 20px rgba(76, 201, 240, 1);
+    height: 6px;
+  }
+}
+
+.command {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 28px;
+  font-weight: bold;
+  color: white;
+  bottom: 0;
+  background-color: #4361ee;
+  box-shadow: 0 0 10px rgba(67, 97, 238, 0.7);
+  transform: translateX(-50%);
+  z-index: 10;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.command.up {
+  background-color: #4cc9f0;
+}
+
+.command.down {
+  background-color: #f72585;
+}
+
+.command.left {
+  background-color: #7209b7;
+}
+
+.command.right {
+  background-color: #3a0ca3;
+}
+
+.command.space {
+  background-color: #ff9e00;
+  width: 100px;
+}
+
+.judgment {
+  position: absolute;
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+  opacity: 0;
+  animation: fade-out 1s;
+  z-index: 15;
+}
+
+@keyframes fade-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+}
+
+.judgment.perfect {
+  color: #00f5d4;
+}
+
+.judgment.good {
+  color: #00bbf9;
+}
+
+.judgment.bad {
+  color: #ffd166;
+}
+
+.judgment.miss {
+  color: #f94144;
+}
+
+#final-score,
+#max-combo {
+  font-size: 24px;
+  margin: 10px 0;
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.pulse {
+  animation: pulse 0.5s;
+}
+
+/* 高亮连击效果 */
+#combo.highlight {
+  color: #f72585;
+  font-weight: bold;
+  font-size: 1.2em;
+  text-shadow: 0 0 10px rgba(247, 37, 133, 0.7);
+}
+
+/* 适应移动设备 */
+@media (max-width: 850px) {
+  #game-container {
+    width: 100%;
+    height: 100vh;
+    border-radius: 0;
+  }
+}
+
+/* 初始添加一个简单的键盘提示 */
+.keyboard-hints {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  z-index: 20;
+}
+
+.key-hint {
+  width: 40px;
+  height: 40px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 5px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.key-hint.space {
+  width: 100px;
+}
+
+/* 添加轨道线 */
+.command-tracks {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.track {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.1);
+  bottom: 0;
+}
+
+.track.up {
+  left: 20%;
+}
+
+.track.down {
+  left: 35%;
+}
+
+.track.left {
+  left: 50%;
+}
+
+.track.right {
+  left: 65%;
+}
+
+.track.space {
+  left: 80%;
+}
